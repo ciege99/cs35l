@@ -1,0 +1,13 @@
+#! /bin/sh
+
+hawaiian=$'pPkKmMnNwWlLhHaAeEiIoOuU\`'
+killUnwanted="sed 's/?//g; s/<u>//g; s/<\/u>//g' $1"
+selectTD=$'grep \'.*<td[^>]*>[pPkKmMnNwWlLhHaAeEiIoOuU \`]*</td>.*\' '
+killTD="sed 's/<td[^>]*>/\n/g; s/<\/td>/\n/g' "
+separateWords="tr -cs '$hawaiian' '\n' | sort -u"
+lower="tr '[:upper:]' '[:lower:]'"
+noBacktick=$' tr "\`" "\'"'
+y=$(eval "$killUnwanted | $selectTD | $killTD | $separateWords | $lower | 
+	$noBacktick")
+echo "$y"
+

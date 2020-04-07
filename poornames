@@ -1,0 +1,91 @@
+#! /bin/sh
+
+
+#A file name component must contain only ASCII letters, ‘.’, ‘-’, and ‘_’. A file name component is a nonempty part of a file name that is a maximal sequence of characters other than ‘/’; for example, the file name ‘/usr/lib64/libstdc++.so.6’ has the three components ‘usr’, ‘lib64’, and ‘libstdc++.so.6’, and the last component’s two ‘+’ characters violate this guideline.
+#A file name component cannot start with ‘-’.
+#Except for ‘.’ and ‘..’, a file name component cannot start with ‘.’.
+#A file name component must not contain more than 14 characters.
+#No two files in the same directory can have names that differ only in case. For example, if a directory contains a file ‘St._Andrews’ it cannot also contain a file name ‘st._anDrEWS’.
+checker() 
+{
+	if [[ ($1 && $2) ]]; then
+		if ! [[ "$1" == "-r" ]]; then
+			>&2 echo "Error: too many operands"; exit 1
+		elif [[ "$2" =~ /-[^/]*/?$ ]]; then
+			>&2 echo "Error: Dir starts with -"; exit 1
+		elif ! [[ -d $2 ]]; then
+			>&2 echo "Error: Path is not a directory"; exit 1
+		elif [[ $3 ]]; then
+			>&2 echo "Error: too many operands"; exit 1
+		elif ! [[ -r $2 ]]; then
+                        >&2 echo "Error: Do not have permissions for dir"
+		else base=$2
+		fi
+	elif [[ $1 ]]; then
+		if [[ "$1" == "-r" ]]; then
+			base=$(pwd)
+		elif ! [[ -d $1 ]]; then
+			>&2 echo "Error: Path is not a directory"; exit 1
+		elif [[ "$1" =~ /-[^/]*/?$ ]]; then
+			>&2 echo "Error: Dir starts with -"; exit 1
+		elif ! [[ -r $1 ]]; then
+                        >&2 echo "Error: Do not have permissions for dir"
+		else base=$1
+		fi
+	else base=$(pwd) 
+	fi 
+	
+	subDirs="$(find $base -mindepth 1 -maxdepth 1 -type d | sort)"
+	allFiles="$(find $base -mindepth 1 -maxdepth 1 | sort)"
+	for i in $allFiles
+	do
+		#regex to make sure all letters are good
+		if ! [[ "$i" =~ /[A-Za-z._-]*$ ]]; then #first test 
+			badFiles="$badFiles""$i"$'\n'
+			continue
+		elif [[ "$i" =~ /-[^/]*$ ]]; then #second test
+			badFiles="$badFiles""$i"$'\n'
+			continue
+		elif [[ "$i" =~ /\.[^.]*[^/]*$ ]]; then #third test - no starting .
+			badFiles="$badFiles""$i"$'\n'
+			continue
+		elif [[ "$i" =~ /\.\.{2,}$ ]]; then #third test - no ..{2,}
+			badFiles="$badFiles""$i"$'\n'
+			continue
+		elif [[ "$i" =~ /\.\.*[^/]*$ ]]; then #third test - no ..[chars]
+			badFiles="$badFiles""$i"$'\n'
+			continue
+		elif [[ "$i" =~ /[^/]{15,}$ ]]; then #fourth test
+			badFiles="$badFiles""$i"$'\n'
+			continue
+		fi
+		matchCheck=$(echo $goodFiles | grep -ioF "$i" | sort)
+                badMatchCheck=$(echo $badFiles | grep -ioF "$i" | sort) 
+		if [[ $matchCheck ]] || [[ $badMatchCheck ]]; then
+			badFiles="$badFiles"$'\n'"$i"$'\n'"$matchCheck"$'\n'"$badMatchCheck"
+			goodFiles=$(echo $goodFiles | sed  "s+$i$++gI" | sort)
+                        matchCheck=""
+			badMatchCheck=""
+                        continue
+                fi
+		goodFiles="$goodFiles""$i"$'\n'
+	done
+	allFiles=""
+	badFiles=$(echo "$badFiles" | sort | sed '/^[[:space:]]*$/d')
+	goodFiles=$(echo "$goodFiles" | sort | sed '/^[[:space:]]*$/d')
+	if [[ $badFiles ]]; then
+		echo "$badFiles"
+	fi
+	badFiles=""
+	goodFiles=""
+	if [ "$1" == "-r"  ]; then
+		if [[ $subDirs ]]; then
+			for i in $subDirs; do
+				if [[ -d $i ]]; then 
+					checker "-r" "$i"
+				fi
+			done
+		fi	
+	fi
+}
+checker "$1" "$2"
